@@ -1,78 +1,57 @@
-const { ApolloServer } = require('apollo-server')
-const { MongoClient } = require('mongodb')
-const users = require('../data/users')
-require('dotenv').config()
+const { ApolloServer } = require("apollo-server");
+const songs = [
+  { id: '1', title: 'Under Pressure' , numberOne: true, performerId: '1' },
+  { id: '2', title: 'Killer Queen', numberOne: false, performerId: '1' },
+  { id: '3', title: 'Edge of Glory', numberOne: false, performerId: '2'}
+]
+
+const performers = [
+  { id: '1', name: 'Queen'},
+  { id: '2', name: 'Lady Gage'}
+]
 
 const typeDefs = `
-  type User {
+  type Song {
     id: ID!
-    name: String
+    title: String!
+    numberOne: Boolean
+    performer: Performer
   }
 
-  type Photo {
+  type Performer {
     id: ID!
     name: String!
-    description: String
-    category: PhotoCategory!
-    url: String!
-  }
-
-  enum PhotoCategory {
-    PORTRAIT
-    LANDSCAPE
-    ACTION
-    SELFIE
-  }
-
-  type Mutation {
-    postPhoto(name: String! description: String PhotoCategory=PORTRAIT): Photo!
+    songs: [Song!]!
   }
 
   type Query {
-    totalPhotos: Int!
-    allPhotos: [Photo!]!
-    totalUsers: Int!
-    allUsers: [Users!]!
-  }
-`
+    allSongs: [Song!]!
+    song(title: String): Song!
+    allPerformers: [Performer!]!
+    performer(name: String): Performer!
+  }`
+
+  // Add another Trivial Resolver for Peformer.songs
 
 const resolvers = {
   Query: {
-    totalPhotos: (parent, args, { photos }) => photos.countDocuments(),
-    allPhotos: (parent, args, {photos}) => photos.find().toArray(),
-    totalUsers: (parent, args, {users}) => users.find().countDocuments(),
-    allUsers: (parent, args, {users}) => users.find().toArray()
-    // countDocuments is a mongodb function for length
+    allSongs: () => songs,
+    song: (parent, {title}) => songs.find(s=> s.title === title),
+    allPerformers: () => performers,
+    performer: (parent, {name}) => performers.find(p => p.name === name)
   },
-  Mutation: {
-    postPhoto: async (parent, args, { photos }) => {
-      const newPhoto = {...args}
-      const {insertedId} = await photos.insertOne(newPhoto)
-      newPhoto.id = insertedId.toString()
-      return newPhoto
-    }
+  Song: {
+    performer: parent => 
+      performers.find(p => parent.performerId === p.id.toString())
   },
-  Photo: {
-    // id: (parent, {id}, {photos}) => photos.id || parent._id,
-    id: parent => parent.id || parent._id.toString(),
-    url: parent => `/img/${parent._id}.jpg`
+  Performer: {
+    songs: parent => songs.filter(s => parent.id.toString() === s.performerId)
   }
 }
 
-const start = async () => {
-  const client = await MongoClient.connect(process.env.POTATO, { useNewUrlParser: true })
+const server = new ApolloServer({
+  typeDefs,
+  resolvers
+})
 
-  const db = client.db()
-
-  const server = new ApolloServer({
-    typeDefs,
-    resolvers,
-    context: {
-      photos: db.collection('photos')
-    }
-  })
-
-  server.listen().then(console.log)
-}
-
-start()
+server.listen().then(console.log);
