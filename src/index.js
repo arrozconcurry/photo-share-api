@@ -1,25 +1,47 @@
 const { ApolloServer } = require('apollo-server')
 const { MongoClient } = require('mongodb')
+const users = require('../data/users')
 require('dotenv').config()
 
 const typeDefs = `
+  type User {
+    id: ID!
+    name: String
+  }
+
   type Photo {
     id: ID!
     name: String!
     description: String
+    category: PhotoCategory!
+    url: String!
+  }
+
+  enum PhotoCategory {
+    PORTRAIT
+    LANDSCAPE
+    ACTION
+    SELFIE
   }
 
   type Mutation {
-    postPhoto(name: String! description: String): Photo!
+    postPhoto(name: String! description: String PhotoCategory=PORTRAIT): Photo!
   }
+
   type Query {
     totalPhotos: Int!
+    allPhotos: [Photo!]!
+    totalUsers: Int!
+    allUsers: [Users!]!
   }
 `
 
 const resolvers = {
   Query: {
-    totalPhotos: (parent, args, { photos }) => photos.countDocuments()
+    totalPhotos: (parent, args, { photos }) => photos.countDocuments(),
+    allPhotos: (parent, args, {photos}) => photos.find().toArray(),
+    totalUsers: (parent, args, {users}) => users.find().countDocuments(),
+    allUsers: (parent, args, {users}) => users.find().toArray()
     // countDocuments is a mongodb function for length
   },
   Mutation: {
@@ -29,6 +51,11 @@ const resolvers = {
       newPhoto.id = insertedId.toString()
       return newPhoto
     }
+  },
+  Photo: {
+    // id: (parent, {id}, {photos}) => photos.id || parent._id,
+    id: parent => parent.id || parent._id.toString(),
+    url: parent => `/img/${parent._id}.jpg`
   }
 }
 
